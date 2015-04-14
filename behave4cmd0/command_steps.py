@@ -9,7 +9,7 @@ TODO:
   matcher that ignores empty lines and whitespace and has contains comparison
 """
 
-from __future__ import print_function
+from __future__ import absolute_import, print_function
 from behave import given, when, then, step, matchers
 from behave4cmd0 import command_shell, command_util, pathutil, textutil
 from behave4cmd0.pathutil import posixpath_normpath
@@ -86,9 +86,13 @@ def step_i_run_command(context, command):
     context.command_result = command_shell.run(command, cwd=context.workdir)
     command_util.workdir_save_coverage_files(context.workdir)
     if False and DEBUG:
-        print(u"XXX run_command: {0}".format(command))
-        print(u"XXX run_command.outout {0}".format(context.command_result.output))
+        print(u"run_command: {0}".format(command))
+        print(u"run_command.output {0}".format(context.command_result.output))
 
+@when(u'I successfully run "{command}"')
+def step_i_successfully_run_command(context, command):
+    step_i_run_command(context, command)
+    step_it_should_pass(context)
 
 @then(u'it should fail with result "{result:int}"')
 def step_it_should_fail_with_result(context, result):
@@ -110,11 +114,13 @@ def step_the_command_returncode_is_nonzero(context):
 
 @then(u'it should pass')
 def step_it_should_pass(context):
-    assert_that(context.command_result.returncode, equal_to(0))
+    assert_that(context.command_result.returncode, equal_to(0),
+                context.command_result.output)
 
 @then(u'it should fail')
 def step_it_should_fail(context):
-    assert_that(context.command_result.returncode, is_not(equal_to(0)))
+    assert_that(context.command_result.returncode, is_not(equal_to(0)),
+                context.command_result.output)
 
 @then(u'it should pass with')
 def step_it_should_pass_with(context):
@@ -284,6 +290,13 @@ def step_remove_directory(context, directory):
 def step_given_the_directory_should_not_exist(context, directory):
     step_remove_directory(context, directory)
 
+@given(u'a directory named "{path}"')
+def step_directory_named_dirname(context, path):
+    assert context.workdir, "REQUIRE: context.workdir"
+    path_ = os.path.join(context.workdir, os.path.normpath(path))
+    if not os.path.exists(path_):
+        os.makedirs(path_)
+    assert os.path.isdir(path_)
 
 @then(u'the directory "{directory}" should exist')
 def step_the_directory_should_exist(context, directory):
@@ -298,6 +311,30 @@ def step_the_directory_should_not_exist(context, directory):
     if not os.path.isabs(directory):
         path_ = os.path.join(context.workdir, os.path.normpath(directory))
     assert_that(not os.path.isdir(path_))
+
+@step(u'the directory "{directory}" exists')
+def step_directory_exists(context, directory):
+    """
+    Verifies that a directory exists.
+
+    .. code-block:: gherkin
+
+        Given the directory "abc.txt" exists
+         When the directory "abc.txt" exists
+    """
+    step_the_directory_should_exist(context, directory)
+
+@step(u'the directory "{directory}" does not exist')
+def step_directory_named_does_not_exist(context, directory):
+    """
+    Verifies that a directory does not exist.
+
+    .. code-block:: gherkin
+
+        Given the directory "abc/" does not exist
+         When the directory "abc/" does not exist
+    """
+    step_the_directory_should_not_exist(context, directory)
 
 # -----------------------------------------------------------------------------
 # FILE STEPS:
@@ -387,7 +424,7 @@ def step_I_set_the_environment_variable_to(context, env_name, env_value):
     context.environ[env_name] = env_value
     os.environ[env_name] = env_value
 
-@step(u'I remove the environment variable {env_name}')
+@step(u'I remove the environment variable "{env_name}"')
 def step_I_remove_the_environment_variable(context, env_name):
     if not hasattr(context, "environ"):
         context.environ = {}

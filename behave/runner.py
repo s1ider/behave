@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import with_statement
+from __future__ import absolute_import, print_function, with_statement
 import contextlib
 import os.path
-import StringIO
+import six
+from six import StringIO
 import sys
 import traceback
 import warnings
@@ -11,11 +12,10 @@ import weakref
 
 from behave import matchers
 from behave.step_registry import setup_step_decorators
-from behave.formatter import formatters
+from behave.formatter._registry import make_formatters
 from behave.configuration import ConfigError
 from behave.log_capture import LoggingCapture
-from behave.runner_util import \
-    collect_feature_locations, parse_features
+from behave.runner_util import collect_feature_locations, parse_features
 
 
 class ContextMaskWarning(UserWarning):
@@ -64,9 +64,15 @@ class Context(object):
       combined from the feature and scenario. This attribute will not be
       present outside of a feature scope.
 
+    .. attribute:: aborted
+
+      This is set to true in the root namespace when the user aborts a test run
+      (:exc:`KeyboardInterrupt` exception). Initially: False.
+
     .. attribute:: failed
 
-      This is set in the root namespace as soon as any step fails.
+      This is set to true in the root namespace as soon as a step fails.
+      Initially: False.
 
     .. attribute:: table
 
@@ -98,8 +104,14 @@ class Context(object):
 
     .. attribute:: stdout_capture
 
-      If logging capture is enabled then this attribute contains the captured
-      stdout as a StringIO instance. It is not present if stdout is not being
+      If stdout capture is enabled then this attribute contains the captured
+      output as a StringIO instance. It is not present if stdout is not being
+      captured.
+
+    .. attribute:: stderr_capture
+
+      If stderr capture is enabled then this attribute contains the captured
+      output as a StringIO instance. It is not present if stderr is not being
       captured.
 
     If an attempt made by user code to overwrite one of these variables, or
@@ -126,6 +138,7 @@ class Context(object):
         self._runner = weakref.proxy(runner)
         self._config = runner.config
         d = self._root = {
+            'aborted': False,
             'failed': False,
             'config': self._config,
             'active_outline': None,
@@ -187,8 +200,8 @@ class Context(object):
 
     def _dump(self):
         for level, frame in enumerate(self._stack):
-            print 'Level %d' % level
-            print repr(frame)
+            print('Level %d' % level)
+            print(repr(frame))
 
     def __getattr__(self, attr):
         if attr[0] == '_':
@@ -252,9 +265,14 @@ class Context(object):
 
         Returns boolean False if the steps are not parseable, True otherwise.
         '''
-        assert isinstance(steps_text, unicode), "Steps must be unicode."
+        assert isinstance(steps_text, six.text_type), "Steps must be unicode."
         if not self.feature:
             raise ValueError('execute_steps() called outside of feature')
+
+        # -- PREPARE: Save original context data for current step.
+        # Needed if step definition that called this method uses .table/.text
+        original_table = getattr(self, "table", None)
+        original_text  = getattr(self, "text", None)
 
         self.feature.parser.variant = 'steps'
         steps = self.feature.parser.parse_steps(steps_text)
@@ -262,10 +280,15 @@ class Context(object):
             passed = step.run(self._runner, quiet=True, capture=False)
             if not passed:
                 # -- ISSUE #96: Provide more substep info to diagnose problem.
-                step_line = "%s %s" % (step.keyword, step.name)
-                more = step.error_message
-                assert False, \
-                    "Sub-step failed: %s\nSubstep info: %s" % (step_line, more)
+                step_line = u"%s %s" % (step.keyword, step.name)
+                message = "%s SUB-STEP: %s" % (step.status.upper(), step_line)
+                if step.error_message:
+                    message += "\nSubstep info: %s" % step.error_message
+                assert False, message
+
+        # -- FINALLY: Restore original context data for current step.
+        self.table = original_table
+        self.text  = original_text
         return True
 
 
@@ -273,14 +296,16 @@ def exec_file(filename, globals={}, locals=None):
     if locals is None:
         locals = globals
     locals['__file__'] = filename
-    if sys.version_info[0] == 3:
-        with open(filename) as f:
-            # -- FIX issue #80: exec(f.read(), globals, locals)
-            filename2 = os.path.relpath(filename, os.getcwd())
-            code = compile(f.read(), filename2, 'exec')
-            exec(code, globals, locals)
-    else:
-        execfile(filename, globals, locals)
+    with open(filename) as f:
+        # -- FIX issue #80: exec(f.read(), globals, locals)
+        # try:
+        filename2 = os.path.relpath(filename, os.getcwd())
+        code = compile(f.read(), filename2, 'exec')
+        exec(code, globals, locals)
+        # except Exception as e:
+        #     e_text = _text(e)
+        #     print("Exception %s: %s" % (e.__class__.__name__, e_text))
+        #     raise
 
 
 def path_getrootdir(path):
@@ -329,18 +354,27 @@ class PathManager(object):
             self.paths.append(path)
 
 
-class Runner(object):
-    def __init__(self, config):
-        self.config = config
-        self.hooks = {}
-        self.features = []
-        self.undefined = []
-        # -- XXX-JE-UNUSED:
-        # self.passed = []
-        # self.failed = []
-        # self.skipped = []
+class ModelRunner(object):
+    """
+    Test runner for a behave model (features).
+    Provides the core functionality of a test runner and
+    the functional API needed by model elements.
 
-        self.path_manager = PathManager()
+    .. attribute:: aborted
+
+          This is set to true when the user aborts a test run
+          (:exc:`KeyboardInterrupt` exception). Initially: False.
+          Stored as derived attribute in :attr:`Context.aborted`.
+    """
+
+    def __init__(self, config, features=None):
+        self.config = config
+        self.features = features or []
+        self.hooks = {}
+        self.formatters = []
+        self.undefined_steps = []
+
+        self.context = None
         self.feature = None
 
         self.stdout_capture = None
@@ -349,15 +383,161 @@ class Runner(object):
         self.old_stdout = None
         self.old_stderr = None
 
+    # @property
+    def _get_aborted(self):
+        value = False
+        if self.context:
+            value = self.context.aborted
+        return value
+
+    # @aborted.setter
+    def _set_aborted(self, value):
+        assert self.context
+        self.context._set_root_attribute('aborted', bool(value))
+
+    aborted = property(_get_aborted, _set_aborted,
+                       doc="Indicates that test run is aborted by the user.")
+
+    def run_hook(self, name, context, *args):
+        if not self.config.dry_run and (name in self.hooks):
+            # try:
+            with context.user_mode():
+                self.hooks[name](context, *args)
+            # except KeyboardInterrupt:
+            #     self.aborted = True
+            #     if name not in ("before_all", "after_all"):
+            #         raise
+
+    def setup_capture(self):
+        if not self.context:
+            self.context = Context(self)
+
+        if self.config.stdout_capture:
+            self.stdout_capture = StringIO()
+            self.context.stdout_capture = self.stdout_capture
+
+        if self.config.stderr_capture:
+            self.stderr_capture = StringIO()
+            self.context.stderr_capture = self.stderr_capture
+
+        if self.config.log_capture:
+            self.log_capture = LoggingCapture(self.config)
+            self.log_capture.inveigle()
+            self.context.log_capture = self.log_capture
+
+    def start_capture(self):
+        if self.config.stdout_capture:
+            # -- REPLACE ONLY: In non-capturing mode.
+            if not self.old_stdout:
+                self.old_stdout = sys.stdout
+                sys.stdout = self.stdout_capture
+            assert sys.stdout is self.stdout_capture
+
+        if self.config.stderr_capture:
+            # -- REPLACE ONLY: In non-capturing mode.
+            if not self.old_stderr:
+                self.old_stderr = sys.stderr
+                sys.stderr = self.stderr_capture
+            assert sys.stderr is self.stderr_capture
+
+    def stop_capture(self):
+        if self.config.stdout_capture:
+            # -- RESTORE ONLY: In capturing mode.
+            if self.old_stdout:
+                sys.stdout = self.old_stdout
+                self.old_stdout = None
+            assert sys.stdout is not self.stdout_capture
+
+        if self.config.stderr_capture:
+            # -- RESTORE ONLY: In capturing mode.
+            if self.old_stderr:
+                sys.stderr = self.old_stderr
+                self.old_stderr = None
+            assert sys.stderr is not self.stderr_capture
+
+    def teardown_capture(self):
+        if self.config.log_capture:
+            self.log_capture.abandon()
+
+    def run_model(self, features=None):
+        if not self.context:
+            self.context = Context(self)
+        if features is None:
+            features = self.features
+
+        # -- ENSURE: context.execute_steps() works in weird cases (hooks, ...)
+        context = self.context
+        self.setup_capture()
+        self.run_hook('before_all', context)
+
+        run_feature = not self.aborted
+        failed_count = 0
+        undefined_steps_initial_size = len(self.undefined_steps)
+        for feature in features:
+            if run_feature:
+                try:
+                    self.feature = feature
+                    for formatter in self.formatters:
+                        formatter.uri(feature.filename)
+
+                    failed = feature.run(self)
+                    if failed:
+                        failed_count += 1
+                        if self.config.stop or self.aborted:
+                            # -- FAIL-EARLY: After first failure.
+                            run_feature = False
+                except KeyboardInterrupt:
+                    self.aborted = True
+                    failed_count += 1
+                    run_feature = False
+
+            # -- ALWAYS: Report run/not-run feature to reporters.
+            # REQUIRED-FOR: Summary to keep track of untested features.
+            for reporter in self.config.reporters:
+                reporter.feature(feature)
+
+        # -- AFTER-ALL:
+        if self.aborted:
+            print("\nABORTED: By user.")
+        for formatter in self.formatters:
+            formatter.close()
+        self.run_hook('after_all', self.context)
+        for reporter in self.config.reporters:
+            reporter.end()
+        # if self.aborted:
+        #     print("\nABORTED: By user.")
+        failed = ((failed_count > 0) or self.aborted or
+                  (len(self.undefined_steps) > undefined_steps_initial_size))
+        return failed
+
+    def run(self):
+        """
+        Implements the run method by running the model.
+        """
+        self.context = Context(self)
+        return self.run_model()
+
+
+class Runner(ModelRunner):
+    """
+    Standard test runner for behave:
+
+      * setup paths
+      * loads environment hooks
+      * loads step definitions
+      * select feature files, parses them and creates model (elements)
+    """
+    def __init__(self, config):
+        super(Runner, self).__init__(config)
+        self.path_manager = PathManager()
         self.base_dir = None
-        self.context = None
-        self.formatters = None
+
 
     def setup_paths(self):
         if self.config.paths:
             if self.config.verbose:
-                print 'Supplied path:', \
-                      ', '.join('"%s"' % path for path in self.config.paths)
+                print('Supplied path:', \
+                      ', '.join('"%s"' % path for path in self.config.paths))
             first_path = self.config.paths[0]
             if hasattr(first_path, "filename"):
                 # -- BETTER: isinstance(first_path, FileLocation):
@@ -374,24 +554,26 @@ class Runner(object):
             # supplied path might be to a feature file
             if os.path.isfile(base_dir):
                 if self.config.verbose:
-                    print 'Primary path is to a file so using its directory'
+                    print('Primary path is to a file so using its directory')
                 base_dir = os.path.dirname(base_dir)
         else:
             if self.config.verbose:
-                print 'Using default path "./features"'
+                print('Using default path "./features"')
             base_dir = os.path.abspath('features')
 
         # Get the root. This is not guaranteed to be '/' because Windows.
         root_dir = path_getrootdir(base_dir)
         new_base_dir = base_dir
+        steps_dir = self.config.steps_dir
+        environment_file = self.config.environment_file
 
         while True:
             if self.config.verbose:
-                print 'Trying base directory:', new_base_dir
+                print('Trying base directory:', new_base_dir)
 
-            if os.path.isdir(os.path.join(new_base_dir, 'steps')):
+            if os.path.isdir(os.path.join(new_base_dir, steps_dir)):
                 break
-            if os.path.isfile(os.path.join(new_base_dir, 'environment.py')):
+            if os.path.isfile(os.path.join(new_base_dir, environment_file)):
                 break
             if new_base_dir == root_dir:
                 break
@@ -401,14 +583,18 @@ class Runner(object):
         if new_base_dir == root_dir:
             if self.config.verbose:
                 if not self.config.paths:
-                    print 'ERROR: Could not find "steps" directory. Please '\
-                        'specify where to find your features.'
+                    print('ERROR: Could not find "%s" directory. '\
+                          'Please specify where to find your features.' % \
+                                steps_dir)
                 else:
-                    print 'ERROR: Could not find "steps" directory in your '\
-                        'specified path "%s"' % base_dir
-            raise ConfigError('No steps directory in "%s"' % base_dir)
+                    print('ERROR: Could not find "%s" directory in your '\
+                        'specified path "%s"' % (steps_dir, base_dir))
+
+            message = 'No %s directory in "%s"' % (steps_dir, base_dir)
+            raise ConfigError(message)
 
         base_dir = new_base_dir
+        self.config.base_dir = base_dir
 
         for dirpath, dirnames, filenames in os.walk(base_dir):
             if [fn for fn in filenames if fn.endswith('.feature')]:
@@ -416,11 +602,11 @@ class Runner(object):
         else:
             if self.config.verbose:
                 if not self.config.paths:
-                    print 'ERROR: Could not find any "<name>.feature" files. '\
-                        'Please specify where to find your features.'
+                    print('ERROR: Could not find any "<name>.feature" files. '\
+                        'Please specify where to find your features.')
                 else:
-                    print 'ERROR: Could not find any "<name>.feature" files '\
-                        'in your specified path "%s"' % base_dir
+                    print('ERROR: Could not find any "<name>.feature" files '\
+                        'in your specified path "%s"' % base_dir)
             raise ConfigError('No feature files in "%s"' % base_dir)
 
         self.base_dir = base_dir
@@ -431,20 +617,32 @@ class Runner(object):
         if base_dir != os.getcwd():
             self.path_manager.add(os.getcwd())
 
-    def load_hooks(self, filename='environment.py'):
+    def before_all_default_hook(self, context):
+        """
+        Default implementation for :func:`before_all()` hook.
+        Setup the logging subsystem based on the configuration data.
+        """
+        context.config.setup_logging()
+
+    def load_hooks(self, filename=None):
+        filename = filename or self.config.environment_file
         hooks_path = os.path.join(self.base_dir, filename)
         if os.path.exists(hooks_path):
             exec_file(hooks_path, self.hooks)
 
+        if 'before_all' not in self.hooks:
+            self.hooks['before_all'] = self.before_all_default_hook
+
     def load_step_definitions(self, extra_step_paths=[]):
         step_globals = {
-            'step_matcher': matchers.step_matcher,
+            'use_step_matcher': matchers.use_step_matcher,
+            'step_matcher':     matchers.step_matcher, # -- DEPRECATING
         }
         setup_step_decorators(step_globals)
 
         # -- Allow steps to import other stuff from the steps dir
         # NOTE: Default matcher can be overridden in "environment.py" hook.
-        steps_dir = os.path.join(self.base_dir, 'steps')
+        steps_dir = os.path.join(self.base_dir, self.config.steps_dir)
         paths = [steps_dir] + list(extra_step_paths)
         with PathManager(paths):
             default_matcher = matchers.current_matcher
@@ -455,14 +653,14 @@ class Runner(object):
                         # Reset to default matcher after each step-definition.
                         # A step-definition may change the matcher 0..N times.
                         # ENSURE: Each step definition has clean globals.
+                        # try:
                         step_module_globals = step_globals.copy()
                         exec_file(os.path.join(path, name), step_module_globals)
                         matchers.current_matcher = default_matcher
-
-    def run_hook(self, name, context, *args):
-        if not self.config.dry_run and (name in self.hooks):
-            with context.user_mode():
-                self.hooks[name](context, *args)
+                        # except Exception as e:
+                        #     e_text = _text(e)
+                        #     print("Exception %s: %s" % (e.__class__.__name__, e_text))
+                        #     raise
 
     def feature_locations(self):
         return collect_feature_locations(self.config.paths)
@@ -473,17 +671,15 @@ class Runner(object):
             self.setup_paths()
             return self.run_with_paths()
 
+
     def run_with_paths(self):
+        self.context = Context(self)
         self.load_hooks()
         self.load_step_definitions()
 
-        context = self.context = Context(self)
         # -- ENSURE: context.execute_steps() works in weird cases (hooks, ...)
-        self.setup_capture()
-        stream_openers = self.config.outputs
-        failed_count = 0
-
-        self.run_hook('before_all', context)
+        # self.setup_capture()
+        # self.run_hook('before_all', self.context)
 
         # -- STEP: Parse all feature files (by using their file location).
         feature_locations = [ filename for filename in self.feature_locations()
@@ -492,71 +688,10 @@ class Runner(object):
         self.features.extend(features)
 
         # -- STEP: Run all features.
-        self.formatters = formatters.get_formatter(self.config, stream_openers)
-        undefined_steps_initial_size = len(self.undefined)
-        run_feature = True
-        for feature in features:
-            if run_feature:
-                self.feature = feature
-                for formatter in self.formatters:
-                    formatter.uri(feature.filename)
+        stream_openers = self.config.outputs
+        self.formatters = make_formatters(self.config, stream_openers)
+        return self.run_model()
 
-                failed = feature.run(self)
-                if failed:
-                    failed_count += 1
-                    if self.config.stop:
-                        # -- FAIL-EARLY: After first failure.
-                        run_feature = False
-
-            # -- ALWAYS: Report run/not-run feature to reporters.
-            # REQUIRED-FOR: Summary to keep track of untested features.
-            for reporter in self.config.reporters:
-                reporter.feature(feature)
-
-        # -- AFTER-ALL:
-        for formatter in self.formatters:
-            formatter.close()
-        self.run_hook('after_all', context)
-        for reporter in self.config.reporters:
-            reporter.end()
-
-        failed = ((failed_count > 0) or
-                  (len(self.undefined) > undefined_steps_initial_size))
-        return failed
-
-    def setup_capture(self):
-        if self.config.stdout_capture:
-            self.stdout_capture = StringIO.StringIO()
-            self.context.stdout_capture = self.stdout_capture
-
-        if self.config.stderr_capture:
-            self.stderr_capture = StringIO.StringIO()
-            self.context.stderr_capture = self.stderr_capture
-
-        if self.config.log_capture:
-            self.log_capture = LoggingCapture(self.config)
-            self.log_capture.inveigle()
-            self.context.log_capture = self.log_capture
-
-    def start_capture(self):
-        if self.config.stdout_capture:
-            self.old_stdout = sys.stdout
-            sys.stdout = self.stdout_capture
-
-        if self.config.stderr_capture:
-            self.old_stderr = sys.stderr
-            sys.stderr = self.stderr_capture
-
-    def stop_capture(self):
-        if self.config.stdout_capture:
-            sys.stdout = self.old_stdout
-
-        if self.config.stderr_capture:
-            sys.stderr = self.old_stderr
-
-    def teardown_capture(self):
-        if self.config.log_capture:
-            self.log_capture.abandon()
 
 
 

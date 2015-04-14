@@ -1,13 +1,10 @@
+.. _tutorial:
+
 ========
 Tutorial
 ========
 
-.. if you change any headings in here make sure you haven't broken the
-   cross-references in the API documentation or module docstrings!
-
-First, `install *behave*.`_
-
-.. _`Install *behave*.`: install.html
+First, :doc:`install behave <install>`.
 
 Now make a directory called "tutorial". In that directory create a file
 called "tutorial.feature" containing:
@@ -18,8 +15,8 @@ called "tutorial.feature" containing:
 
    Scenario: run a simple test
       Given we have behave installed
-       when we implement a test
-       then behave will test it for us!
+       When we implement a test
+       Then behave will test it for us!
 
 Make a new directory called "tutorial/steps". In that directory create a
 file called "tutorial.py" containing:
@@ -29,15 +26,15 @@ file called "tutorial.py" containing:
   from behave import *
 
   @given('we have behave installed')
-  def impl(context):
+  def step_impl(context):
       pass
 
   @when('we implement a test')
-  def impl(context):
+  def step_impl(context):
       assert True is not False
 
   @then('behave will test it for us!')
-  def impl(context):
+  def step_impl(context):
       assert context.failed is False
 
 Run behave::
@@ -54,7 +51,7 @@ Run behave::
     1 scenario passed, 0 failed, 0 skipped
     3 steps passed, 0 failed, 0 skipped, 0 undefined
 
-Now, continue reading to learn how to the most of *behave*.
+Now, continue reading to learn how to make the most of *behave*.
 
 
 Features
@@ -97,27 +94,26 @@ command-line switch.
 Feature Files
 =============
 
-A feature file has a `natural language format`_ describing a feature or
-part of a feature with representative examples of expected outcomes.
+A feature file has a :ref:`natural language format <chapter.gherkin>`
+describing a feature or part of a feature with representative examples of
+expected outcomes.
 They're plain-text (encoded in UTF-8) and look something like:
-
-.. _`natural language format`: gherkin.html#gherkin:-feature-testing-language
 
 .. code-block:: gherkin
 
   Feature: Fight or flight
     In order to increase the ninja survival rate,
     As a ninja commander
-    I want my ninjas to decide whether to take on an 
+    I want my ninjas to decide whether to take on an
     opponent based on their skill levels
 
     Scenario: Weaker opponent
-      Given the ninja has a third level black-belt 
+      Given the ninja has a third level black-belt
        When attacked by a samurai
        Then the ninja should engage the opponent
 
     Scenario: Stronger opponent
-      Given the ninja has a third level black-belt 
+      Given the ninja has a third level black-belt
        When attacked by Chuck Norris
        Then the ninja should run for his life
 
@@ -141,13 +137,13 @@ to take the name of their preceding step, so:
 .. code-block:: gherkin
 
     Scenario: Stronger opponent
-      Given the ninja has a third level black-belt 
+      Given the ninja has a third level black-belt
        When attacked by Chuck Norris
        Then the ninja should run for his life
         And fall off a cliff
 
-In this case *behave* will look for a step definiton for "Then fall off a
-cliff".
+In this case *behave* will look for a step definition for
+``"Then fall off a cliff"``.
 
 
 Scenario Outlines
@@ -211,8 +207,8 @@ required data into a model.
         | name      | department  |
         | Barry     | Beer Cans   |
         | Pudey     | Silly Walks |
-        | Two-Lumps | Silly Walks | 
- 
+        | Two-Lumps | Silly Walks |
+
     When we count the number of people in each department
     Then we will find two people in "Silly Walks"
      But we will find one person in "Beer Cans"
@@ -224,7 +220,7 @@ function. The table for the example above could be accessed like so:
 .. code-block:: python
 
   @given('a set of specific users')
-  def impl(context):
+  def step_impl(context):
       for row in context.table:
           model.add_user(name=row['name'], department=row['department'])
 
@@ -237,17 +233,15 @@ Python Step Implementations
 ===========================
 
 Steps used in the scenarios are implemented in Python files in the "steps"
-directory. You can call these whatever you like as long as they're
-*filename*.py in the steps directory. You don't need to tell *behave* which
+directory. You can call these whatever you like as long as they use
+the python ``*.py`` file extension. You don't need to tell *behave* which
 ones to use - it'll use all of them.
 
-The full detail of the Python side of *behave* is in the `API
-documenation`_.
-
-.. _`API documenation`: api.html
+The full detail of the Python side of *behave* is in the
+:doc:`API documentation <api>`.
 
 Steps are identified using decorators which match the predicate from the
-feature file: given, when, then and step (variants with Title case are also
+feature file: **given**, **when**, **then** and **step** (variants with Title case are also
 available if that's your preference.) The decorator accepts a string
 containing the rest of the phrase used in the scenario step it belongs to.
 
@@ -259,20 +253,20 @@ Given a Scenario:
      Given I search for a valid account
       Then I will see the account details
 
-Step code implementing the two steps here might look like (using selenium
-webdriver and some other helpers):
+Step code implementing the two steps here might look like
+(using selenium webdriver and some other helpers):
 
 .. code-block:: python
 
  @given('I search for a valid account')
- def impl(context):
+ def step_impl(context):
     context.browser.get('http://localhost:8000/index')
     form = get_element(context.browser, tag='form')
     get_element(form, name="msisdn").send_keys('61415551234')
     form.submit()
 
  @then('I will see the account details')
- def impl(context):
+ def step_impl(context):
     elements = find_elements(context.browser, id='no-account')
     eq_(elements, [], 'account not found')
     h = get_element(context.browser, id='account-head')
@@ -282,7 +276,7 @@ webdriver and some other helpers):
 The ``step`` decorator matches the step to *any* step type, "given", "when"
 or "then". The "and" and "but" step types are renamed internally to take
 the preceding step's keyword (so an "and" following a "given" will become a
-"given" internally and use a "give" decorated step).
+"given" internally and use a **given** decorated step).
 
 If you find you'd like your step implementation to invoke another step you
 may do so with the :class:`~behave.runner.Context` method
@@ -293,7 +287,7 @@ This function allows you to, for example:
 .. code-block:: python
 
     @when('I do the same thing as before')
-    def impl(context):
+    def step_impl(context):
         context.execute_steps('''
             when I press the big red button
              and I duck
@@ -326,38 +320,65 @@ clauses (with a Given step that puts some text into
 .. code-block:: python
 
  @then('the result page will include "{text}"')
- def impl(context, text):
+ def step_impl(context, text):
     if text not in context.response:
-        fail('%r not in %r' % (message, context.response))
+        fail('%r not in %r' % (text, context.response))
 
-There's two parsers available by default in *behave*:
+There are several parsers available in *behave* (by default):
 
-**parse** (the default)
-  This is a `simple parser`_ that uses a format very much like the Python
-  builtin ``format()``. You must use named fields which are then matched to
-  your ``step()`` function arguments.
+**parse** (the default, based on: :pypi:`parse`)
+    Provides a simple parser that replaces regular expressions for step parameters
+    with a readable syntax like ``{param:Type}``.
+    The syntax is inspired by the Python builtin ``string.format()`` function.
+    Step parameters must use the named fields syntax of :pypi:`parse`
+    in step definitions. The named fields are extracted,
+    optionally type converted and then used as step function arguments.
+
+    Supports type conversions by using type converters
+    (see :func:`~behave.register_type()`).
+
+**cfparse** (extends: :pypi:`parse`, requires: :pypi:`parse_type`)
+    Provides an extended parser with "Cardinality Field" (CF) support.
+    Automatically creates missing type converters for related cardinality
+    as long as a type converter for cardinality=1 is provided.
+    Supports parse expressions like:
+
+        * ``{values:Type+}`` (cardinality=1..N, many)
+        * ``{values:Type*}`` (cardinality=0..N, many0)
+        * ``{value:Type?}``  (cardinality=0..1, optional).
+
+    Supports type conversions (as above).
+
 **re**
-  This uses full regular expressions to parse the clause text. You will
-  need to use named groups "(?P<name>...)" to define the variables pulled
-  from the text and passed to your ``step()`` function.
+    This uses full regular expressions to parse the clause text. You will
+    need to use named groups "(?P<name>...)" to define the variables pulled
+    from the text and passed to your ``step()`` function.
 
-To specify which parser to use invoke :func:`~behave.matchers.step_matcher`
+    Type conversion is **not supported**.
+    A step function writer may implement type conversion
+    inside the step function (implementation).
+
+To specify which parser to use invoke :func:`~behave.use_step_matcher`
 with the name of the matcher to use. You may change matcher to suit
-specific step functions - the last call to ``step_matcher`` before a step
+specific step functions - the last call to ``use_step_matcher`` before a step
 function declaration will be the one it uses.
 
-.. _`simple parser`: http://pypi.python.org/pypi/parse
+.. note::
+
+  The function :func:`~behave.matchers.step_matcher()` is becoming deprecated.
+  Use :func:`~behave.use_step_matcher()` instead.
+
 
 Context
 -------
 
 You'll have noticed the "context" variable that's passed around. It's a
 clever place where you and *behave* can store information to share around.
-It runs at three levels, automatically managed by *behave*. 
+It runs at three levels, automatically managed by *behave*.
 
 When *behave* launches into a new feature or scenario it adds a new layer
 to the context, allowing the new activity level to add new values, or
-overwrite ones previosuly defined, for the duration of that activity. These
+overwrite ones previously defined, for the duration of that activity. These
 can be thought of as scopes.
 
 You can define values in your `environmental controls`_ file which may be
@@ -371,13 +392,13 @@ steps you define you might have:
 .. code-block:: python
 
   @given('I request a new widget for an account via SOAP')
-  def impl(context):
+  def step_impl(context):
       client = Client("http://127.0.0.1:8000/soap/")
       context.response = client.Allocate(customer_first='Firstname',
           customer_last='Lastname', colour='red')
 
   @then('I should receive an OK SOAP response')
-  def impl(context):
+  def step_impl(context):
       eq_(context.response['ok'], 1)
 
 There's also some values added to the context by *behave* itself:
@@ -386,7 +407,7 @@ There's also some values added to the context by *behave* itself:
   This holds any table data associated with a step.
 
 **text**
-  This holds any multiline text associated with a step.
+  This holds any multi-line text associated with a step.
 
 **failed**
   This is set at the root of the context when any step fails. It is
@@ -426,8 +447,8 @@ from the feature file. They have a number of attributes:
 **name**
   The name of the step (the text after the keyword.)
 **tags**
-  A list of the tags attached to the section or step. See `controlling
-  things with tags`_.
+  A list of the tags attached to the section or step.
+  See `controlling things with tags`_.
 **filename** and **line**
   The file name (or "<string>") and line number of the statement.
 
@@ -462,6 +483,8 @@ retain the database state between features or even initialise the database
 for to each scenario.
 
 
+.. _`controlling things with tags`:
+
 Controlling Things With Tags
 ============================
 
@@ -475,20 +498,20 @@ Given a feature file with:
   Feature: Fight or flight
     In order to increase the ninja survival rate,
     As a ninja commander
-    I want my ninjas to decide whether to take on an 
+    I want my ninjas to decide whether to take on an
     opponent based on their skill levels
 
     @slow
     Scenario: Weaker opponent
-      Given the ninja has a third level black-belt 
+      Given the ninja has a third level black-belt
       When attacked by a samurai
       Then the ninja should engage the opponent
 
     Scenario: Stronger opponent
-      Given the ninja has a third level black-belt 
+      Given the ninja has a third level black-belt
       When attacked by Chuck Norris
       Then the ninja should run for his life
-      
+
 then running ``behave --tags=slow`` will run just the scenarios tagged
 ``@slow``. If you wish to check everything *except* the slow ones then you
 may run ``behave --tags=-slow``.
@@ -541,12 +564,13 @@ browser and web server then you could tag them ``@browser``:
           context.thread.join()
           context.browser.quit()
 
+
 Works In Progress
 =================
 
 *behave* supports the concept of a highly-unstable "work in progress"
 scenario that you're actively developing. This scenario may produce strange
-logging, or odd output to stdout or just plain interact in unexepected ways
+logging, or odd output to stdout or just plain interact in unexpected ways
 with *behave*'s scenario runner.
 
 To make testing such scenarios simpler we've implemented a "-w"
@@ -560,9 +584,53 @@ command-line flag. This flag:
 
     if not context.config.log_capture:
         logging.basicConfig(level=logging.DEBUG)
-     
+
 3. turns off pretty output - no ANSI escape sequences to confuse your
    scenario's output
 4. only runs scenarios tagged with "@wip"
 5. stops at the first error
+
+
+.. index::
+    single: debug-on-error
+
+.. _debug-on-error:
+
+Debug-on-Error (in Case of Step Failures)
+=========================================
+
+A "debug on error/failure" functionality can easily be provided,
+by using the ``after_step()`` hook.
+The debugger is started when a step fails.
+
+It is in general a good idea to enable this functionality only when needed
+(in interactive mode). The functionality is enabled (in this example)
+by using the user-specific configuration data. A user can:
+
+  * provide a userdata define on command-line
+  * store a value in the "behave.userdata" section of behave's configuration file
+
+.. code-block:: python
+
+    # -- FILE: features/environment.py
+    # USE: behave -D BEHAVE_DEBUG_ON_ERROR         (to enable  debug-on-error)
+    # USE: behave -D BEHAVE_DEBUG_ON_ERROR=yes     (to enable  debug-on-error)
+    # USE: behave -D BEHAVE_DEBUG_ON_ERROR=no      (to disable debug-on-error)
+
+    BEHAVE_DEBUG_ON_ERROR = False
+
+    def setup_debug_on_error(userdata):
+        global BEHAVE_DEBUG_ON_ERROR
+        BEHAVE_DEBUG_ON_ERROR = userdata.getbool("BEHAVE_DEBUG_ON_ERROR")
+
+    def before_all(context):
+        setup_debug_on_error(context.config.userdata)
+
+    def after_step(context, step):
+        if BEHAVE_DEBUG_ON_ERROR and step.status == "failed":
+            # -- ENTER DEBUGGER: Zoom in on failure location.
+            # NOTE: Use IPython debugger, same for pdb (basic python debugger).
+            import ipdb
+            ipdb.post_mortem(step.exc_traceback)
+
 

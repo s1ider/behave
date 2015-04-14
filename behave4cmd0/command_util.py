@@ -6,7 +6,9 @@ TODO:
   matcher that ignores empty lines and whitespace and has contains comparison
 """
 
+from __future__ import absolute_import
 from behave4cmd0 import pathutil
+from behave4cmd0.__setup import TOP, TOPA
 import os.path
 import shutil
 from fnmatch import fnmatch
@@ -14,9 +16,9 @@ from fnmatch import fnmatch
 # -----------------------------------------------------------------------------
 # CONSTANTS:
 # -----------------------------------------------------------------------------
-HERE    = os.path.dirname(__file__)
-TOP     = os.path.join(HERE, "..")
-TOPA    = os.path.abspath(TOP)
+# HERE    = os.path.dirname(__file__)
+# TOP     = os.path.join(HERE, "..")
+# TOPA    = os.path.abspath(TOP)
 WORKDIR = os.path.join(TOP, "__WORKDIR__")
 
 

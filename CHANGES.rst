@@ -1,7 +1,146 @@
 Version History
 ===============================================================================
 
-Version: 1.2.3a20 (unreleased)
+Version: 1.2.6 (unreleased)
+-------------------------------------------------------------------------------
+
+GOALS:
+
+  - Improve support for Windows
+
+DOCUMENTATION:
+
+  * pull #307: Typo in readme (provided by: dflock)
+  * pull #305: behave.rst related fixes reapplied (provided by: bittner)
+  * pull #292: Use title-cased keywords in tutorial scenario (provided by: neoblackcap)
+  * pull #291: Tiny tweaks in tutorial docs (provided by: bernardpaulus)
+
+ENHANCEMENTS:
+
+  * issue #301: Support default tags in configfile
+
+
+Version: 1.2.5 (2015-01-31)
+-------------------------------------------------------------------------------
+
+:Same as: Version 1.2.5a1 (unreleased).
+
+NEWS and CHANGES:
+
+  - General:
+
+    * Improve support for Python3 (py3.3, py3.4; #268)
+    * Various unicode related fixes (Unicode errors with non-ASCII, etc.)
+    * Drop support for Python 2.5
+
+  - Running:
+
+    * ScenarioOutline: Annotates name with row.id, ... to better represent row.
+    * NEW: Active Tags, see docs (`New and Noteworthy`_).
+    * NEW: Test stages, see docs (`New and Noteworthy`_).
+    * NEW: User-specific configuration data, see docs (`New and Noteworthy`_).
+    * CHANGED: Undefined step snippet uses now NotImplementedError (related to: #254)
+
+  - Model:
+
+    * ScenarioOutline: Various improvements, see docs (`New and Noteworthy`_).
+
+  - Formatters:
+
+    * plain: Can now show tags, but currently disabled per default
+    * NEW: steps.catalog: Readable summary of all steps (similar to: steps.doc, #271)
+    * NEW: User-defined formatters, see docs (`New and Noteworthy`_).
+
+ENHANCEMENTS:
+
+  * pull #285: Travis CI improvements to use container environment, etc. (provided by: thedrow)
+  * pull #272: Use option role to format command line arg docs (provided by: helenst)
+  * pull #271: Provide steps.catalog formatter (provided by: berdroid)
+  * pull #261: Support "setup.cfg" as configuration file, too (provided by: bittner)
+  * pull #260: Documentation tweaks and typo fixes (provided by: bittner)
+  * pull #254: Undefined step raises NotImplementedError instead of assert False (provided by: mhfrantz)
+  * issue #242: JUnitReporter can show scenario tags (provided by: rigomes)
+  * issue #240: Test Stages with different step implementations (provided by: attilammagyar, jenisys)
+  * issue #238: Allow to skip scenario in step function (provided by: hotgloupi, jenisys)
+  * issue #228: Exclude scenario fron run (provided by: jdeppe, jenisys)
+  * issue #227: Add a way to add command line options to behave (provided by: attilammagyar, jenisys)
+
+FIXED:
+
+  * pull  #283: Fix "fork me" image in docs (provided by: frodopwns)
+  * issue #280: Fix missing begin/end-markers in RegexMatcher (provided by: tomekwszelaki, jenisys)
+  * pull  #268: Fix py3 compatibility with all tests passed (provided by: sunliwen)
+  * pull  #252: Related to #251 (provided by: mcepl)
+  * pull  #190: UnicodeDecodeError in tracebacks (provided by: b3ni, vrutkovs, related to: #226, #230)
+  * issue #257: Fix JUnitReporter (XML) for Python3 (provided by: actionless)
+  * issue #249: Fix a number of docstring problems (provided by: masak)
+  * issue #253: Various problems in PrettyFormatter.exception()
+  * issue #251: Unicode crash in model.py (provided by: mcepl, jenisys)
+  * issue #236: Command line docs are confusing (solved by: #272)
+  * issue #230: problem with assert message that contains ascii over 128 value (provided by: jenisys)
+  * issue #226: UnicodeDecodeError in tracebacks (provided by: md1023, karulis, jenisys)
+  * issue #221: Fix some PY2/PY3 incompatibilities (provided by: johbo)
+  * pull  #219: IDE's unknown modules import issue (provided by: xbx)
+  * issue #216: Using --wip option does not disable ANSI escape sequences (coloring).
+  * issue #119: Python3 support for behave (solved by: #268 and ...)
+  * issue #82:  JUnitReporter fails with Python 3.x (fixed with: #257, #268)
+
+
+.. _`New and Noteworthy`: https://github.com/behave/behave/blob/master/docs/new_and_noteworthy.rst
+
+
+Version: 1.2.4 (2014-03-02)
+-------------------------------------------------------------------------------
+
+:Same as: Version 1.2.4a1 (unreleased).
+
+NEWS and CHANGES:
+
+  - Running:
+
+    * ABORT-BY-USER: Better handle KeyboardInterrupt to abort a test run.
+    * feature list files (formerly: feature configfiles) support wildcards.
+    * Simplify and improve setup of logging subsystem (related to: #143, #177)
+
+  - Step matchers:
+
+    * cfparse: Step matcher with "Cardinality Field" support (was: optional).
+
+  - Formatters:
+
+    * steps.usage: Avoid duplicated steps usage due to Scenario Outlines.
+    * json: Ensures now that matched step params (match args) cause valid JSON.
+
+
+IMPROVEMENT:
+
+  * issue #108: behave.main() can be called with command-line args (provided by: medwards, jenisys)
+  * issue #172: Subfolders in junit XML filenames (provided by: roignac).
+  * issue #203: Integration with pdb (debug on error; basic support)
+  * Simple test runner to run behave tests from "setup.py"
+
+FIXED:
+
+  * issue #143: Logging starts with a StreamHandler way too early (provided by: jtatum, jenisys).
+  * issue #175: Scenario isn't marked as 'failed' when Background step fails
+  * issue #177: Cannot setup logging_format
+  * issue #181: Escape apostrophes in undefined steps snippets
+  * issue #184: TypeError when running behave with --include option (provided by: s1ider).
+  * issue #186: ScenarioOutline uses wrong return value when if fails (provided by: mdavezac)
+  * issue #188: Better diagnostics if nested step is undefined
+  * issue #191: Using context.execute_steps() may change context.table/.text
+  * issue #194: Nested steps prevent that original stdout/stderr is restored
+  * issue #199: behave tag expression bug when or-not logic is used
+
+
+Version: 1.2.3 (2013-07-08)
+-------------------------------------------------------------------------------
+
+Latest stable version.
+Same as last development version.
+
+
+Version: 1.2.3a20 (2013-07-08)
 -------------------------------------------------------------------------------
 
 NEWS and CHANGES:
@@ -21,6 +160,7 @@ NEWS and CHANGES:
 
   - Formatters:
 
+    * NEW: progress3 formatter, ScenarioStepProgressFormatter (provided by: roignac).
     * NEW: sphinx.steps formatter, generate Sphinx-based docs for step definitions (related to #166).
     * NEW: steps formatter, shows available step definitions.
     * NEW: steps.doc formatter, shows documentation of step definitions (related to: #55).
@@ -34,6 +174,8 @@ IMPROVEMENT:
 
 FIXED:
 
+  * issue #172: JUnit report filename sometimes truncated (provided by: roignac).
+  * issue #171: Importing step from other step file fails with AmbiguousStep Error.
   * issue #165: FIX issue #114: do not print a blank line when the feature is skipped (provided by: florentx).
   * issue #164: StepRegistry.find_match() extends registered step_type lists.
   * issue #122: Failing selftest feature: selftest.features/duplicated_step.feature.

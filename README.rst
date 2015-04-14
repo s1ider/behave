@@ -2,21 +2,29 @@
 Behave
 ======
 
-.. image:: https://travis-ci.org/jenisys/behave.png?branch=master
-    :target: https://travis-ci.org/jenisys/behave
+.. image:: https://badges.gitter.im/Join%20Chat.svg
+   :alt: Join the chat at https://gitter.im/behave/behave
+   :target: https://gitter.im/behave/behave?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
+.. image:: https://travis-ci.org/behave/behave.png?branch=master
+    :target: https://travis-ci.org/behave/behave
     :alt: Travis CI Build Status
 
 .. image:: https://pypip.in/v/behave/badge.png
-    :target: https://crate.io/packages/behave/
-    :alt: Latest PyPI version
+    :target: https://pypi.python.org/pypi/behave
+    :alt: Latest Version
 
 .. image:: https://pypip.in/d/behave/badge.png
-    :target: https://crate.io/packages/behave/
-    :alt: Number of PyPI downloads
+    :target: https://pypi.python.org/pypi/behave
+    :alt: Downloads
+
+.. image:: https://pypip.in/license/behave/badge.png
+    :target: https://pypi.python.org/pypi/behave/
+    :alt: License
 
 .. |logo| image:: https://raw.github.com/behave/behave/master/docs/_static/behave_logo1.png
 
-behave is behaviour-driven development, Python style.
+behave is behavior-driven development, Python style.
 
 |logo|
 
@@ -30,42 +38,52 @@ code.
 First, `install *behave*.`_
 
 
-Now make a directory called "example". In that directory create a file
-called "example.feature" containing::
+Now make a directory called "features/".
+In that directory create a file called "example.feature" containing:
 
- Feature: showing off behave
+.. code-block:: gherkin
 
-   Scenario: run a simple test
-      Given we have behave installed
-       when we implement a test
-       then behave will test it for us!
+    # -- FILE: features/example.feature
+    Feature: Showing off behave
 
-Make a new directory called "example/steps". In that directory create a
-file called "example.py" containing::
+      Scenario: Run a simple test
+        Given we have behave installed
+         When we implement 5 tests
+         Then behave will test them for us!
 
-  from behave import *
+Make a new directory called "features/steps/".
+In that directory create a file called "example_steps.py" containing:
 
-  @given('we have behave installed')
-  def impl(context):
-      pass
+.. code-block:: python
 
-  @when('we implement a test')
-  def impl(context):
-      assert True is not False
+    # -- FILE: features/steps/example_steps.py
+    from behave import given, when, then, step
 
-  @then('behave will test it for us!')
-  def impl(context):
-      assert context.failed is False
+    @given('we have behave installed')
+    def step_impl(context):
+        pass
 
-Run behave::
+    @when('we implement {number:d} tests')
+    def step_impl(context, number):  # -- NOTE: number is converted into integer
+        assert number > 1 or number == 0
+        context.tests_count = number
 
-    % behave
-    Feature: showin off behave # example/example.feature:1
+    @then('behave will test them for us!')
+    def step_impl(context):
+        assert context.failed is False
+        assert context.tests_count >= 0
 
-      Scenario: run a simple test        # example/example.feature:3
-        Given we have behave installed   # example/steps/example.py:3
-        When we implement a test         # example/steps/example.py:7
-        Then behave will test it for us! # example/steps/example.py:11
+Run behave:
+
+.. code-block:: bash
+
+    $ behave
+    Feature: Showing off behave # features/example.feature:2
+
+      Scenario: Run a simple test          # features/example.feature:4
+        Given we have behave installed     # features/steps/example_steps.py:4
+        When we implement 5 tests          # features/steps/example_steps.py:8
+        Then behave will test them for us! # features/steps/example_steps.py:13
 
     1 feature passed, 0 failed, 0 skipped
     1 scenario passed, 0 failed, 0 skipped
@@ -76,54 +94,19 @@ we recommend the `tutorial`_ and then the `feature testing language`_ and
 `api`_ references.
 
 
-Project Info
--------------------------------------------------------------------------------
-
-=============== ===============================================================
-Category        Hyperlink
-=============== ===============================================================
-Documentation:  http://packages.python.org/behave/
-                (or: https://behave.readthedocs.org/)
-Download:       http://pypi.python.org/pypi/behave (or: `github archive`_)
-Development:    https://github.com/behave/behave
-Issue Tracker:  https://github.com/behave/behave/issues
-Changelog:      `CHANGES.rst <CHANGES.rst>`_
-=============== ===============================================================
-
-
-.. _`Install *behave*.`: http://packages.python.org/behave/install.html
-.. _`tutorial`: http://packages.python.org/behave/tutorial.html#features
-.. _`feature testing language`: http://packages.python.org/behave/gherkin.html
-.. _`api`: http://packages.python.org/behave/api.html
-.. _`github archive`: https://github.com/behave/behave/tags
+.. _`Install *behave*.`: http://pythonhosted.org/behave/install.html
+.. _`tutorial`: http://pythonhosted.org/behave/tutorial.html#features
+.. _`feature testing language`: http://pythonhosted.org/behave/gherkin.html
+.. _`api`: http://pythonhosted.org/behave/api.html
 
 
 More Information
 -------------------------------------------------------------------------------
 
+* `behave documentation`_ (`latest changes`_)
 * `behave.example`_: Behave Examples and Tutorials (docs, executable examples).
 
-
+.. _behave documentation: http://pythonhosted.org/behave/
+.. _latest changes: https://github.com/behave/behave/blob/master/CHANGES.rst
 .. _behave.example: https://github.com/jenisys/behave.example
 
-
-Testing Domains
--------------------------------------------------------------------------------
-
-Behave and other BDD frameworks allow you to provide **step libraries**
-to reuse step definitions in similar projects that address the same 
-problem domain.
-
-Support of the following testing domains is currently known:
-
-=============== ================= =========================================================
-Testing Domain   Name              Description
-=============== ================= =========================================================
-Command-line    `behave4cmd`_     Test command-line tools, like behave, etc. (coming soon).
-Web Apps        `django-behave`_  Test Django Web apps with behave.
-Web, SMS, ...   `behaving`_       Test Web Apps, Email, SMS, Personas (step library).
-=============== ================= =========================================================
-
-.. _behave4cmd: https://github.com/jenisys/behave4cmd
-.. _django-behave: https://github.com/rwillmer/django-behave
-.. _behaving: https://github.com/ggozad/behaving

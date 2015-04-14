@@ -4,9 +4,9 @@ Feature: Step dialect for generic steps
   I want to have a possibility to use generic steps
   So that I can execute a sequence of steps without BDD keywords (Given/When/Then)
 
-  | SPECIFICATION: Generic step
-  |   * Prefix each step with a '*' (asterisk/star) character to mark it as step
-  |   * Provide step-functions/step definition with "@step" decorator
+  . SPECIFICATION: Generic step
+  .   * Prefix each step with a '*' (asterisk/star) character to mark it as step
+  .   * Provide step-functions/step definition with "@step" decorator
 
 
   @setup
@@ -49,7 +49,7 @@ Feature: Step dialect for generic steps
       * another step passes
 
 
-  Scenario: Simple step-by-step example
+  Scenario: Simple step-by-step example 2
     Given a file named "features/generic_steps.feature" with:
         """
         Feature:

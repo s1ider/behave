@@ -12,10 +12,11 @@ TODO:
     http://sphinx-doc.org/
 """
 
+from __future__ import absolute_import, print_function
 from behave.formatter.steps import AbstractStepsFormatter
 from behave.formatter import sphinx_util
-from behave.compat.os_path import relpath
 from behave.model import Table
+from operator import attrgetter
 import inspect
 import os.path
 import sys
@@ -56,7 +57,7 @@ class StepsModule(object):
         if not self._filename:
             if self.step_definitions:
                 filename = inspect.getfile(self.step_definitions[0].func)
-                self._filename = relpath(filename)
+                self._filename = os.path.relpath(filename)
         return self._filename
 
     @property
@@ -137,7 +138,7 @@ class SphinxStepsDocumentGenerator(object):
     def ensure_destdir_exists(self):
         assert self.destdir
         if os.path.isfile(self.destdir):
-            print "OOPS: remove %s" % self.destdir
+            print("OOPS: remove %s" % self.destdir)
             os.remove(self.destdir)
         if not os.path.exists(self.destdir):
             os.makedirs(self.destdir)
@@ -162,11 +163,10 @@ class SphinxStepsDocumentGenerator(object):
                 step_modules_map[step_filename] = step_module
             step_module.append(step_definition)
 
-        compare_name = lambda x, y: cmp(x.name, y.name)
-        compare_location = lambda x, y: cmp(x.location, y.location)
-        step_modules = sorted(step_modules_map.values(), compare_name)
+        step_modules = sorted(step_modules_map.values(), key=attrgetter("name"))
         for module in step_modules:
-            step_definitions = sorted(module.step_definitions, compare_location)
+            step_definitions = sorted(module.step_definitions,
+                                      key=attrgetter("location"))
             module.step_definitions = step_definitions
         return step_modules
 

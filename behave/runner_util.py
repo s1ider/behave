@@ -3,13 +3,17 @@
 Contains utility functions and classes for Runners.
 """
 
+from __future__ import absolute_import
 from behave import parser
 from behave.model import FileLocation
 from bisect import bisect
+from six import string_types
+import codecs
+import glob
 import os.path
 import re
+import six
 import sys
-import types
 
 
 # -----------------------------------------------------------------------------
@@ -55,7 +59,7 @@ class FileLocationParser:
 
 
 # -----------------------------------------------------------------------------
-# CLASS: FeatureScenarioLocationCollector
+# CLASSES:
 # -----------------------------------------------------------------------------
 class FeatureScenarioLocationCollector(object):
     """
@@ -199,6 +203,67 @@ class FeatureScenarioLocationCollector(object):
         return self.feature
 
 
+class FeatureListParser(object):
+    """
+    Read textual file, ala '@features.txt'. This file contains:
+
+      * a feature filename or FileLocation on each line
+      * empty lines (skipped)
+      * comment lines (skipped)
+      * wildcards are expanded to select 0..N filenames or directories
+
+    Relative path names are evaluated relative to the listfile directory.
+    A leading '@' (AT) character is removed from the listfile name.
+    """
+
+    @staticmethod
+    def parse(text, here=None):
+        """
+        Parse contents of a features list file as text.
+
+        :param text: Contents of a features list(file).
+        :param here: Current working directory to use (optional).
+        :return: List of FileLocation objects
+        """
+        locations = []
+        for line in text.splitlines():
+            filename = line.strip()
+            if not filename:
+                continue    # SKIP: Over empty line(s).
+            elif filename.startswith('#'):
+                continue    # SKIP: Over comment line(s).
+
+            if here and not os.path.isabs(filename):
+                filename = os.path.join(here, line)
+            filename = os.path.normpath(filename)
+            if glob.has_magic(filename):
+                # -- WITH WILDCARDS:
+                for filename2 in glob.iglob(filename):
+                    location = FileLocationParser.parse(filename2)
+                    locations.append(location)
+            else:
+                location = FileLocationParser.parse(filename)
+                locations.append(location)
+        return locations
+
+    @classmethod
+    def parse_file(cls, filename):
+        """
+        Read textual file, ala '@features.txt'.
+
+        :param filename:  Name of feature list file.
+        :return: List of feature file locations.
+        """
+        if filename.startswith('@'):
+            filename = filename[1:]
+        if not os.path.isfile(filename):
+            raise FileNotFoundError(filename)
+        here = os.path.dirname(filename) or "."
+        # -- MAYBE BETTER:
+        # contents = codecs.open(filename, "utf-8").read()
+        contents = open(filename).read()
+        return cls.parse(contents, here)
+
 # -----------------------------------------------------------------------------
 # FUNCTIONS:
 # -----------------------------------------------------------------------------
@@ -218,7 +283,7 @@ def parse_features(feature_files, language=None):
     features = []
     for location in feature_files:
         if not isinstance(location, FileLocation):
-            assert isinstance(location, basestring)
+            assert isinstance(location, string_types)
             location = FileLocation(os.path.normpath(location))
 
         if location.filename == scenario_collector.filename:
@@ -246,38 +311,6 @@ def parse_features(feature_files, language=None):
     return features
 
 
-def parse_features_configfile(features_configfile):
-    """
-    Read textual file, ala '@features.txt'. This file contains:
-
-      * a feature filename in each line
-      * empty lines (skipped)
-      * comment lines (skipped)
-
-    Relative path names are evaluated relative to the configfile directory.
-    A leading '@' (AT) character is removed from the configfile name.
-
-    :param features_configfile:  Name of features configfile.
-    :return: List of feature file locations.
-    """
-    if features_configfile.startswith('@'):
-        features_configfile = features_configfile[1:]
-    if not os.path.isfile(features_configfile):
-        raise FileNotFoundError(features_configfile)
-    here = os.path.dirname(features_configfile) or "."
-    locations = []
-    for line in open(features_configfile).readlines():
-        line = line.strip()
-        if not line:
-            continue    # SKIP: Over empty line(s).
-        elif line.startswith('#'):
-            continue    # SKIP: Over comment line(s).
-        filename = os.path.normpath(os.path.join(here, line))
-        location = FileLocationParser.parse(filename)
-        locations.append(location)
-    return locations
-
-
 def collect_feature_locations(paths, strict=True):
     """
     Collect feature file names by processing list of paths (from command line).
@@ -302,7 +335,7 @@ def collect_feature_locations(paths, strict=True):
                         locations.append(location)
         elif path.startswith('@'):
             # -- USE: behave @list_of_features.txt
-            locations.extend(parse_features_configfile(path[1:]))
+            locations.extend(FeatureListParser.parse_file(path[1:]))
         else:
             # -- OTHERWISE: Normal filename or location (schema: filename:line)
             location = FileLocationParser.parse(path)
@@ -323,17 +356,51 @@ def make_undefined_step_snippet(step, language=None):
     :param language: i18n language, optionally needed for step text parsing.
     :return: Undefined-step snippet (as string).
     """
-    if isinstance(step, types.StringTypes):
+    if isinstance(step, string_types):
         step_text = step
         steps = parser.parse_steps(step_text, language=language)
         step = steps[0]
         assert step, "ParseError: %s" % step_text
-    prefix = u""
-    if sys.version_info[0] == 2:
-        prefix = u"u"
+    # prefix = u""
+    # if sys.version_info[0] == 2:
+    #    prefix = u"u"
+    prefix = u"u"
+    single_quote = "'"
+    if single_quote in step.name:
+        step.name = step.name.replace(single_quote, r"\'")
 
-    # snippet  = u"@"+ step.step_type +"("+ prefix + step.name + "')"
-    # snippet += u"\ndef impl(context):\n    assert False\n\n"
-    schema = u"@%s(%s'%s')\ndef impl(context):\n    assert False\n\n"
-    snippet = schema % (step.step_type, prefix, step.name)
+    schema = u"@%s(%s'%s')\ndef step_impl(context):\n"
+    schema += u"    raise NotImplementedError(%s'STEP: %s %s')\n\n"
+    snippet = schema % (step.step_type, prefix, step.name,
+                        prefix, step.step_type.title(), step.name)
     return snippet
+
+
+def print_undefined_step_snippets(undefined_steps, stream=None, colored=True):
+    """
+    Print snippets for the undefined steps that were discovered.
+
+    :param undefined_steps:  List of undefined steps (as list<string>).
+    :param stream:      Output stream to use (default: sys.stderr).
+    :param colored:     Indicates if coloring should be used (default: True)
+    """
+    if not undefined_steps:
+        return
+    if not stream:
+        stream = sys.stderr
+
+    msg = u"\nYou can implement step definitions for undefined steps with "
+    msg += u"these snippets:\n\n"
+    printed = set()
+    for step in undefined_steps:
+        if step in printed:
+            continue
+        printed.add(step)
+        msg += make_undefined_step_snippet(step)
+
+    if colored:
+        # -- OOPS: Unclear if stream supports ANSI coloring.
+        from behave.formatter.ansi_escapes import escapes
+        msg = escapes['undefined'] + msg + escapes['reset']
+    stream.write(msg)
+    stream.flush()

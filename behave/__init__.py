@@ -16,12 +16,14 @@ To get started, we recommend the `tutorial`_ and then the `test language`_ and
 .. _`api`: api.html
 '''
 
-__version__ = '1.2.3a20'
-
+from __future__ import absolute_import
 from behave.step_registry import *
-from behave.matchers import step_matcher
+from behave.matchers import use_step_matcher, step_matcher, register_type
 
-names = 'given when then step'
-names = names + ' ' + names.title()
-names = names + ' step_matcher'
-__all__ = names.split()
+__all__ = [
+    "given", "when", "then", "step", "use_step_matcher", "register_type",
+    "Given", "When", "Then", "Step",
+    # -- DEPRECATING:
+    "step_matcher"
+]
+__version__ = '1.2.6.dev0'

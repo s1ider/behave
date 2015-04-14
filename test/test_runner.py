@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import with_statement
 
+from __future__ import absolute_import, print_function, with_statement
 from collections import defaultdict
+from six import StringIO
+import six
 import os.path
-import StringIO
 import sys
 import warnings
 import tempfile
@@ -18,7 +19,11 @@ from behave.log_capture import LoggingCapture
 from behave.formatter.base import StreamOpener
 
 
-class TestContext(object):
+# -- CONVENIENCE-ALIAS:
+_text = six.text_type
+
+
+class TestContext(unittest.TestCase):
     def setUp(self):
         r = Mock()
         self.config = r.config = Mock()
@@ -119,7 +124,7 @@ class TestContext(object):
 
         warnings.showwarning = old_showwarning
 
-        print repr(warns)
+        print(repr(warns))
         assert warns, 'warns is empty!'
         warning = warns[0]
         assert isinstance(warning, runner.ContextMaskWarning), 'warning is not a ContextMaskWarning'
@@ -164,7 +169,7 @@ class TestContext(object):
 
         warnings.showwarning = old_showwarning
 
-        print repr(warns)
+        print(repr(warns))
         assert warns, 'warns is empty!'
         warning = warns[0]
         assert isinstance(warning, runner.ContextMaskWarning), 'warning is not a ContextMaskWarning'
@@ -190,7 +195,7 @@ class TestContext(object):
 
         warnings.showwarning = old_showwarning
 
-        print repr(warns)
+        print(repr(warns))
         assert warns
         warning = warns[0]
         assert isinstance(warning, runner.ContextMaskWarning)
@@ -263,6 +268,8 @@ class TestContext_ExecuteSteps(unittest.TestCase):
         runner_.config.stderr_capture  = False
         runner_.config.log_capture  = False
         self.context = runner.Context(runner_)
+        # self.context.text = None
+        # self.context.table = None
         runner_.context = self.context
         self.context.feature = Mock()
         self.context.feature.parser = parser.Parser()
@@ -291,8 +298,20 @@ Then a step passes
         with patch('behave.step_registry.registry', self.step_registry):
             try:
                 result = self.context.execute_steps(doc)
-            except AssertionError, e:  # -- PY26-CLEANUP-MARK
-                ok_("Sub-step failed: When a step fails" in str(e))
+            except AssertionError as e:
+                ok_("FAILED SUB-STEP: When a step fails" in _text(e))
+
+    def test_execute_steps_with_undefined_step(self):
+        doc = u'''
+Given a step passes
+When a step is undefined
+Then a step passes
+'''.lstrip()
+        with patch('behave.step_registry.registry', self.step_registry):
+            try:
+                result = self.context.execute_steps(doc)
+            except AssertionError as e:
+                ok_("UNDEFINED SUB-STEP: When a step is undefined" in _text(e))
 
     def test_execute_steps_with_text(self):
         doc = u'''
@@ -327,8 +346,60 @@ Then a step passes
             eq_(result, True)
             eq_(expected_table, ExampleSteps.table)
 
+    def test_context_table_is_restored_after_execute_steps_without_table(self):
+        doc = u'''
+Given a step passes
+Then a step passes
+'''.lstrip()
+        with patch('behave.step_registry.registry', self.step_registry):
+            original_table = "<ORIGINAL_TABLE>"
+            self.context.table = original_table
+            self.context.execute_steps(doc)
+            eq_(self.context.table, original_table)
+
+    def test_context_table_is_restored_after_execute_steps_with_table(self):
+        doc = u'''
+Given a step with a table:
+    | Name  | Age |
+    | Alice |  12 |
+    | Bob   |  23 |
+Then a step passes
+'''.lstrip()
+        with patch('behave.step_registry.registry', self.step_registry):
+            original_table = "<ORIGINAL_TABLE>"
+            self.context.table = original_table
+            self.context.execute_steps(doc)
+            eq_(self.context.table, original_table)
+
+    def test_context_text_is_restored_after_execute_steps_without_text(self):
+        doc = u'''
+Given a step passes
+Then a step passes
+'''.lstrip()
+        with patch('behave.step_registry.registry', self.step_registry):
+            original_text = "<ORIGINAL_TEXT>"
+            self.context.text = original_text
+            self.context.execute_steps(doc)
+            eq_(self.context.text, original_text)
+
+    def test_context_text_is_restored_after_execute_steps_with_text(self):
+        doc = u'''
+Given a step passes
+When a step with text:
+    """
+    Lorem ipsum
+    Ipsum lorem
+    """
+'''.lstrip()
+        with patch('behave.step_registry.registry', self.step_registry):
+            original_text = "<ORIGINAL_TEXT>"
+            self.context.text = original_text
+            self.context.execute_steps(doc)
+            eq_(self.context.text, original_text)
+
+
     @raises(ValueError)
-    def test_execute_steps_called_without_feature(self):
+    def test_execute_steps_should_fail_when_called_without_feature(self):
         doc = u'''
 Given a passes
 Then a step passes
@@ -336,6 +407,13 @@ Then a step passes
         with patch('behave.step_registry.registry', self.step_registry):
             self.context.feature = None
             self.context.execute_steps(doc)
+
+
+def create_mock_config():
+    config = Mock()
+    config.steps_dir = 'steps'
+    config.environment_file = 'environment.py'
+    return config
 
 
 class TestRunner(object):
@@ -346,7 +424,7 @@ class TestRunner(object):
                 base_dir = 'fake/path'
                 hooks_path = os.path.join(base_dir, 'environment.py')
 
-                r = runner.Runner(None)
+                r = runner.Runner(create_mock_config())
                 r.base_dir = base_dir
                 r.load_hooks()
 
@@ -382,7 +460,7 @@ class TestRunner(object):
         r.setup_capture()
 
         assert r.stdout_capture is not None
-        assert isinstance(r.stdout_capture, StringIO.StringIO)
+        assert isinstance(r.stdout_capture, StringIO)
 
     def test_setup_capture_does_not_create_stringio_if_not_wanted(self):
         r = runner.Runner(Mock())
@@ -476,6 +554,7 @@ class TestRunner(object):
 
     def test_run_returns_true_if_everything_passed(self):
         r = runner.Runner(Mock())
+        r.setup_capture = Mock()
         r.setup_paths = Mock()
         r.run_with_paths = Mock()
         r.run_with_paths.return_value = True
@@ -483,13 +562,14 @@ class TestRunner(object):
 
     def test_run_returns_false_if_anything_failed(self):
         r = runner.Runner(Mock())
+        r.setup_capture = Mock()
         r.setup_paths = Mock()
         r.run_with_paths = Mock()
         r.run_with_paths.return_value = False
         assert not r.run()
 
 
-class TestRunWithPaths(object):
+class TestRunWithPaths(unittest.TestCase):
     def setUp(self):
         self.config = Mock()
         self.config.reporters = []
@@ -528,8 +608,8 @@ class TestRunWithPaths(object):
         self.runner.run_with_paths()
 
         eq_(self.run_hook.call_args_list, [
-            (('before_all', self.runner.context), {}),
             ((), {}),
+            (('before_all', self.runner.context), {}),
             (('after_all', self.runner.context), {}),
         ])
 
@@ -580,7 +660,7 @@ class FsMock(object):
             return bits
 
         paths = [os.path.join(self.base, *full_split(path)) for path in paths]
-        print repr(paths)
+        print(repr(paths))
         self.paths = paths
         self.files = set()
         self.dirs = defaultdict(list)
@@ -650,7 +730,7 @@ class FsMock(object):
 
 class TestFeatureDirectory(object):
     def test_default_path_no_steps(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = []
         config.verbose = True
         r = runner.Runner(config)
@@ -664,7 +744,7 @@ class TestFeatureDirectory(object):
         ok_(('isdir', os.path.join(fs.base, 'features', 'steps')) in fs.calls)
 
     def test_default_path_no_features(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = []
         config.verbose = True
         r = runner.Runner(config)
@@ -675,7 +755,7 @@ class TestFeatureDirectory(object):
                 assert_raises(ConfigError, r.setup_paths)
 
     def test_default_path(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = []
         config.verbose = True
         r = runner.Runner(config)
@@ -690,7 +770,7 @@ class TestFeatureDirectory(object):
         eq_(r.base_dir, os.path.abspath('features'))
 
     def test_supplied_feature_file(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = ['foo.feature']
         config.verbose = True
         r = runner.Runner(config)
@@ -708,7 +788,7 @@ class TestFeatureDirectory(object):
         eq_(r.base_dir, fs.base)
 
     def test_supplied_feature_file_no_steps(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = ['foo.feature']
         config.verbose = True
         r = runner.Runner(config)
@@ -721,7 +801,7 @@ class TestFeatureDirectory(object):
                     assert_raises(ConfigError, r.setup_paths)
 
     def test_supplied_feature_directory(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = ['spam']
         config.verbose = True
         r = runner.Runner(config)
@@ -738,7 +818,7 @@ class TestFeatureDirectory(object):
         eq_(r.base_dir, os.path.join(fs.base, 'spam'))
 
     def test_supplied_feature_directory_no_steps(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = ['spam']
         config.verbose = True
         r = runner.Runner(config)
@@ -752,7 +832,7 @@ class TestFeatureDirectory(object):
         ok_(('isdir', os.path.join(fs.base, 'spam', 'steps')) in fs.calls)
 
     def test_supplied_feature_directory_missing(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = ['spam']
         config.verbose = True
         r = runner.Runner(config)
@@ -766,7 +846,7 @@ class TestFeatureDirectory(object):
 
 class TestFeatureDirectoryLayout2(object):
     def test_default_path(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = []
         config.verbose = True
         r = runner.Runner(config)
@@ -786,7 +866,7 @@ class TestFeatureDirectoryLayout2(object):
         eq_(r.base_dir, os.path.abspath('features'))
 
     def test_supplied_root_directory(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = [ 'features' ]
         config.verbose = True
         r = runner.Runner(config)
@@ -807,7 +887,7 @@ class TestFeatureDirectoryLayout2(object):
         eq_(r.base_dir, os.path.join(fs.base, 'features'))
 
     def test_supplied_root_directory_no_steps(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = [ 'features' ]
         config.verbose = True
         r = runner.Runner(config)
@@ -828,7 +908,7 @@ class TestFeatureDirectoryLayout2(object):
 
 
     def test_supplied_feature_file(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = [ 'features/group1/foo.feature' ]
         config.verbose = True
         r = runner.Runner(config)
@@ -851,7 +931,7 @@ class TestFeatureDirectoryLayout2(object):
         eq_(r.base_dir, fs.join(fs.base, "features"))
 
     def test_supplied_feature_file_no_steps(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = [ 'features/group1/foo.feature' ]
         config.verbose = True
         r = runner.Runner(config)
@@ -868,7 +948,7 @@ class TestFeatureDirectoryLayout2(object):
                     assert_raises(ConfigError, r.setup_paths)
 
     def test_supplied_feature_directory(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = [ 'features/group1' ]
         config.verbose = True
         r = runner.Runner(config)
@@ -890,7 +970,7 @@ class TestFeatureDirectoryLayout2(object):
 
 
     def test_supplied_feature_directory_no_steps(self):
-        config = Mock()
+        config = create_mock_config()
         config.paths = [ 'features/group1' ]
         config.verbose = True
         r = runner.Runner(config)

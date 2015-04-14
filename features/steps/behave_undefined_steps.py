@@ -1,4 +1,4 @@
-# -*- coding -*-
+# -*- coding: UTF-8 -*-
 """
 Provides step definitions for behave based on behave4cmd.
 
@@ -6,7 +6,8 @@ REQUIRES:
   * behave4cmd.steplib.output steps (command output from behave).
 """
 
-from behave import given, when, then, step
+from __future__ import absolute_import
+from behave import then
 from behave.runner_util import make_undefined_step_snippet
 
 
@@ -19,7 +20,7 @@ def text_indent(text, indent_size=0):
 
 
 # -----------------------------------------------------------------------------
-# STEPS:
+# STEPS FOR: Undefined step definitions
 # -----------------------------------------------------------------------------
 @then(u'an undefined-step snippets section exists')
 def step_undefined_step_snippets_section_exists(context):

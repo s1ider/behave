@@ -1,9 +1,9 @@
 @issue
 Feature: Issue #152: Fix encoding issues
 
-    | I fixed two encoding issues in pretty formatter and in JUnit serialization.
-    | Now it's possible to use accented letters in feature files and
-    | create JUnit reports from the tests.
+  . I fixed two encoding issues in pretty formatter and in JUnit serialization.
+  . Now it's possible to use accented letters in feature files and
+  . create JUnit reports from the tests.
 
 
   Scenario: Ensure JUnit reports can be created from a foreign language
@@ -29,6 +29,7 @@ Feature: Issue #152: Fix encoding issues
       """
 
 
+  @reuse.colocated_test
   Scenario: Ensure JUnit reports can be created from a foreign language
     Given I use the current directory as working directory
     When I run "behave -f plain --junit --no-timings tools/test-features/french.feature"
