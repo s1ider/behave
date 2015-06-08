@@ -274,8 +274,8 @@ options = [
      dict(action='store_true',
           help="Alias for --no-snippets --no-source.")),
 
-    (('-r', '--retry')
-      dict(dest='retry_count'),
+    (('-r', '--retry'),
+      dict(dest='retry_count',
            help="""Retry failing features a number of times before declaring
 +                  failure.""")),
 
