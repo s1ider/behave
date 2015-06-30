@@ -279,7 +279,7 @@ class JUnitReporter(Reporter):
             text += _text(step.error_message)
             failure.append(CDATA(text))
             case.append(failure)
-        elif scenario.status in ('skipped', 'untested') and self.config.show_skipped
+        elif scenario.status in ('skipped', 'untested') and self.config.show_skipped:
             report.counts_skipped += 1
             step = self.select_step_with_status('undefined', scenario)
             if step:
